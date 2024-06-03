@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>June 2024 Calendar</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            width: 75%;
+            margin: 20px auto;
+        }
+        .day {
+            border: 1px solid #ccc;
+            padding: 10px;
+            position: relative;
+        }
+        .day.crossed {
+            text-decoration: line-through;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: green;
+            margin-top: 5px;
+        }
+        .total {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        .buttons {
+            margin-top: 5px;
+        }
+        .buttons button {
+            width: 40px;
+            height: 30px;
+            font-size: 1.2em;
+        }
+        .daily-total {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="calendar">
+    <!-- Generate days of June 2024 -->
+    <script>
+        const daysInJune = 30;
+        let state = loadState(daysInJune);
+        const calendar = document.querySelector('.calendar');
+        let totalSum = 0;
+        let currentDate = new Date();
+        let curdom = currentDate.getDate();
+
+        for (let i = 1; i <= daysInJune; i++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.classList.add('day');
+            dayDiv.id = `day-${i}`;
+            dayDiv.dataset.total = `${state[i - 1]}`;
+            dayDiv.innerHTML = `
+                <div>June ${i}</div>
+                <div class="buttons">
+                    <button onclick="updateDay(${i}, 1)">+</button>
+                    <button onclick="updateDay(${i}, -1)">-</button>
+                </div>
+                <div class="daily-total">0</div>
+                <div class="progress-bar" style="width: 0;"></div>
+            `;
+            calendar.appendChild(dayDiv);
+            updateDay(i, 0);
+        }
+
+        function updateDay(day, value) {
+            let state = loadState(daysInJune);
+            const dayDiv = document.getElementById(`day-${day}`);
+            const currentTotal = state[day - 1] || 0;
+            let newTotal = currentTotal + value;
+
+            if (newTotal < 0) newTotal = 0;
+            if (newTotal > 100) newTotal = 100;
+
+            state[day - 1] = newTotal;
+
+            dayDiv.dataset.total = `${newTotal}`;
+            dayDiv.querySelector('.daily-total').innerText = `${newTotal}`;
+
+            const progressBar = dayDiv.querySelector('.progress-bar');
+            if (newTotal >= 100) {
+                dayDiv.classList.add('crossed');
+                progressBar.style.width = '100%';
+            } else {
+                dayDiv.classList.remove('crossed');
+                progressBar.style.width = `${newTotal}%`;
+            }
+
+            updateTotalSum();
+            saveState(state);
+        }
+
+        function updateTotalSum() {
+            totalSum = Array.from(document.querySelectorAll('.day'))
+                .reduce((sum, day) => sum + (parseInt(day.dataset.total) || 0), 0);
+            if (document.querySelector('.total')) document.querySelector('.total').innerText = `Total: ${totalSum}`;
+        }
+
+        function loadState(sz) {
+         const state = localStorage.getItem('appState');
+         let result = state ? JSON.parse(state) : new Array(sz).fill(0);
+         if (result.length == sz) return result;
+         else return new Array(sz).fill(0);
+        }
+        function saveState(state) {
+         localStorage.setItem('appState', JSON.stringify(state));
+        }
+    </script>
+</div>
+
+<div class="total">Total: 0</div>
+
+<script>
+  document.querySelector('.total').innerText = `Total: ${totalSum}`;
+</script>
+</body>
+</html>
