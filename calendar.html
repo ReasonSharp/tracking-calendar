@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>June 2024 Calendar</title>
+    <title>Custom Calendar</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            text-align: center;
+            background: black;
         }
         .calendar {
             display: grid;
@@ -16,9 +18,10 @@
             margin: 20px auto;
         }
         .day {
-            border: 1px solid #ccc;
+            border: 1px solid #007;
             padding: 10px;
             position: relative;
+            color: #77f;
         }
         .day.crossed {
             text-decoration: line-through;
@@ -28,10 +31,11 @@
             background-color: green;
             margin-top: 5px;
         }
-        .total {
-            text-align: center;
-            margin-top: 20px;
+        .total, .overall-progress {
+            margin: 20px auto;
             font-size: 1.2em;
+            width: 75%;
+            color: #77f;
         }
         .buttons {
             margin-top: 5px;
@@ -40,91 +44,156 @@
             width: 40px;
             height: 30px;
             font-size: 1.2em;
+            background: #444;
         }
         .daily-total {
             margin-top: 5px;
+        }
+        .reset-btn {
+            margin-top: 20px;
+            background: #444;
         }
     </style>
 </head>
 <body>
 
-<div class="calendar">
-    <!-- Generate days of June 2024 -->
-    <script>
-        const daysInJune = 30;
-        let state = loadState(daysInJune);
-        const calendar = document.querySelector('.calendar');
-        let totalSum = 0;
-        let currentDate = new Date();
-        let curdom = currentDate.getDate();
+<div class="form-container">
+    <form id="calendar-form">
+        <label for="month">Month:</label>
+        <input type="month" id="month" name="month" required>
+        <br>
+        <label for="target">Daily Target:</label>
+        <input type="number" id="target" name="target" min="1" required>
+        <br><br>
+        <button type="submit">Generate Calendar</button>
+    </form>
+</div>
 
-        for (let i = 1; i <= daysInJune; i++) {
+<div class="calendar-container" style="display: none;">
+    <div class="calendar"></div>
+    <div class="overall-progress">
+        Overall Progress: <span id="overall-progress-bar">0%</span>
+        <div class="progress-bar" id="overall-progress" style="width: 0%;"></div>
+    </div>
+    <div class="total">Total: 0</div>
+    <button class="reset-btn" onclick="resetCalendar()">Reset</button>
+</div>
+
+<script>
+    let state = loadState();
+
+    if (state) generateCalendar(new Date(state.year, state.month - 1, 1), state.target, state);
+
+    document.getElementById('calendar-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const form = event.target;
+        const month = new Date(form.month.value);
+        const target = parseInt(form.target.value);
+
+        if (isNaN(target) || target <= 0) {
+            alert("Please enter a valid target number greater than zero.");
+            return;
+        }
+
+        generateCalendar(month, target, null);
+    });
+
+    function generateCalendar(month, target, passedState) {
+        const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+        let state = passedState ? passedState : { year: month.getFullYear(), month: month.getMonth() + 1, target: target, days: new Array(daysInMonth).fill(0) };
+        saveState(state);
+        const calendarContainer = document.querySelector('.calendar-container');
+        const calendar = document.querySelector('.calendar');
+        calendar.innerHTML = '';
+        let totalSum = 0;
+
+        for (let i = 1; i <= daysInMonth; i++) {
             const dayDiv = document.createElement('div');
             dayDiv.classList.add('day');
             dayDiv.id = `day-${i}`;
             dayDiv.dataset.total = `${state[i - 1]}`;
             dayDiv.innerHTML = `
-                <div>June ${i}</div>
+                <div>${month.toLocaleString('default', { month: 'long' })} ${i}</div>
                 <div class="buttons">
-                    <button onclick="updateDay(${i}, 1)">+</button>
-                    <button onclick="updateDay(${i}, -1)">-</button>
+                    <button onclick="updateDay(${i}, ${target}, 1)">+</button>
+                    <button onclick="updateDay(${i}, ${target}, -1)">-</button>
                 </div>
                 <div class="daily-total">0</div>
                 <div class="progress-bar" style="width: 0;"></div>
             `;
             calendar.appendChild(dayDiv);
-            updateDay(i, 0);
+            updateDay(i, target, 0);
         }
 
-        function updateDay(day, value) {
-            let state = loadState(daysInJune);
-            const dayDiv = document.getElementById(`day-${day}`);
-            const currentTotal = state[day - 1] || 0;
-            let newTotal = currentTotal + value;
+        updateOverallProgress(target);
+        document.querySelector('.form-container').style.display = 'none';
+        calendarContainer.style.display = 'block';
+    }
 
-            if (newTotal < 0) newTotal = 0;
-            if (newTotal > 100) newTotal = 100;
+    function updateDay(day, target, value) {
+        let state = loadState();
+        const dayDiv = document.getElementById(`day-${day}`);
+        const currentTotal = state.days[day - 1] || 0;
+        let newTotal = currentTotal + value;
 
-            state[day - 1] = newTotal;
+        if (newTotal < 0) newTotal = 0;
+        if (newTotal > target) newTotal = target;
 
-            dayDiv.dataset.total = `${newTotal}`;
-            dayDiv.querySelector('.daily-total').innerText = `${newTotal}`;
+        state.days[day - 1] = newTotal;
 
-            const progressBar = dayDiv.querySelector('.progress-bar');
-            if (newTotal >= 100) {
-                dayDiv.classList.add('crossed');
-                progressBar.style.width = '100%';
-            } else {
-                dayDiv.classList.remove('crossed');
-                progressBar.style.width = `${newTotal}%`;
-            }
+        dayDiv.dataset.total = `${newTotal}`;
+        dayDiv.querySelector('.daily-total').innerText = `${newTotal}`;
 
-            updateTotalSum();
-            saveState(state);
+        const progressBar = dayDiv.querySelector('.progress-bar');
+        if (newTotal >= target) {
+            dayDiv.classList.add('crossed');
+            progressBar.style.width = '100%';
+        } else {
+            dayDiv.classList.remove('crossed');
+            progressBar.style.width = `${(newTotal / target) * 100}%`;
         }
 
-        function updateTotalSum() {
-            totalSum = Array.from(document.querySelectorAll('.day'))
-                .reduce((sum, day) => sum + (parseInt(day.dataset.total) || 0), 0);
-            if (document.querySelector('.total')) document.querySelector('.total').innerText = `Total: ${totalSum}`;
-        }
+        updateOverallProgress(target);
+        updateTotalSum(target);
+        saveState(state);
+    }
 
-        function loadState(sz) {
-         const state = localStorage.getItem('appState');
-         let result = state ? JSON.parse(state) : new Array(sz).fill(0);
-         if (result.length == sz) return result;
-         else return new Array(sz).fill(0);
-        }
-        function saveState(state) {
-         localStorage.setItem('appState', JSON.stringify(state));
-        }
-    </script>
-</div>
+    function updateOverallProgress(target) {
+        const totalSum = Array.from(document.querySelectorAll('.day'))
+            .reduce((sum, day) => sum + (parseInt(day.dataset.total) || 0), 0);
+        const daysInMonth = document.querySelectorAll('.day').length;
+        const overallProgress = (totalSum / (daysInMonth * target)) * 100;
+        const roundedProgress = overallProgress.toFixed(2);
+        document.getElementById('overall-progress-bar').innerText = `${roundedProgress}%`;
+        document.getElementById('overall-progress').style.width = `${overallProgress}%`;
+    }
 
-<div class="total">Total: 0</div>
+    function updateTotalSum(target) {
+        const totalSum = Array.from(document.querySelectorAll('.day'))
+            .reduce((sum, day) => sum + (parseInt(day.dataset.total) || 0), 0);
+        document.querySelector('.total').innerText = `Total: ${totalSum}`;
+    }
 
-<script>
-  document.querySelector('.total').innerText = `Total: ${totalSum}`;
+    function loadState() {
+        const state = localStorage.getItem('appState');
+        const now = new Date();
+        const month = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const sz = month.getDate();
+        let result = state ? JSON.parse(state) : null;
+        if (result && result.target > 0 && result.days.length == new Date(result.year, result.month, 0).getDate()) return result;
+        else return null;
+    }
+
+    function saveState(state) {
+        localStorage.setItem('appState', JSON.stringify(state));
+    }
+
+    function resetCalendar() {
+        localStorage.removeItem('appState');
+        document.querySelector('.form-container').style.display = 'block';
+        document.querySelector('.calendar-container').style.display = 'none';
+    }
 </script>
+
 </body>
 </html>
